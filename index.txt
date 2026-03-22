@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Судоку</title>
+  <script src="https://bridge.max.ru/mobi-bridge.js"></script>
+  <style>
+    :root {
+      --bg:        #f2f4f8;
+      --bg2:       #ffffff;
+      --bg3:       #e8ecf2;
+      --card:      #ffffff;
+      --border:    rgba(0,0,0,0.1);
+      --accent:    #e8c847;
+      --accent2:   #3ddc84;
+      --text:      #1a1d2e;
+      --muted:     #7a82a0;
+      --given:     #1a1d2e;
+      --user:      #2563eb;
+      --error:     #ef4444;
+      --selected:  #fef9c3;
+      --highlight: #f0f9ff;
+      --same:      #dbeafe;
+      --radius:    12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+      user-select: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+    }
+
+    /* ══ HEADER ══ */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 10px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header-title {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: var(--text);
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .timer-display {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      min-width: 60px;
+      text-align: right;
+    }
+    .header-btn {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      touch-action: manipulation;
+    }
+
+    /* ══ DIFFICULTY ══ */
+    .difficulty-bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .diff-btn {
+      flex: 1;
+      padding: 7px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: all 0.15s;
+    }
+    .diff-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #1a1d2e;
+    }
+
+    /* ══ MAIN ══ */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 12px 8px;
+      gap: 12px;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ══ GRID ══ */
+    .grid-wrap {
+      width: 100%;
+      max-width: 380px;
+      aspect-ratio: 1;
+    }
+    .sudoku-grid {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      grid-template-rows: repeat(9, 1fr);
+      border: 2.5px solid var(--text);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--bg2);
+    }
+    .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(14px, 3.5vw, 22px);
+      font-weight: 700;
+      border-right: 1px solid rgba(0,0,0,0.12);
+      border-bottom: 1px solid rgba(0,0,0,0.12);
+      cursor: pointer;
+      transition: background 0.1s;
+      position: relative;
+    }
+    /* Толстые границы блоков 3×3 */
+    .cell:nth-child(3n) { border-right: 2px solid rgba(0,0,0,0.35); }
+    .cell:nth-child(9n) { border-right: none; }
+    .cell[data-row="2"] { border-bottom: 2px solid rgba(0,0,0,0.35); }
+    .cell[data-row="5"] { border-bottom: 2px solid rgba(0,0,0,0.35); }
+    .cell[data-row="8"] { border-bottom: none; }
+
+    .cell.given    { color: var(--given); }
+    .cell.user-val { color: var(--user); }
+    .cell.error    { color: var(--error); background: #fee2e2 !important; }
+    .cell.selected { background: var(--selected) !important; }
+    .cell.highlight{ background: var(--highlight); }
+    .cell.same-num { background: var(--same); }
+
+    /* Маленькие подсказки */
+    .cell-notes {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      grid-template-rows: repeat(3,1fr);
+      width: 100%;
+      height: 100%;
+      padding: 1px;
+    }
+    .note {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(7px, 1.5vw, 10px);
+      font-weight: 600;
+      color: var(--muted);
+      line-height: 1;
+    }
+
+    /* ══ TOOLBAR ══ */
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 380px;
+      align-items: center;
+      justify-content: center;
+    }
+    .tool-btn {
+      flex: 1;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .tool-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #1a1d2e;
+    }
+    .tool-btn:active { opacity: 0.75; }
+
+    /* ══ NUMPAD ══ */
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 5px;
+      width: 100%;
+      max-width: 380px;
+    }
+    .num-btn {
+      aspect-ratio: 1;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      font-size: clamp(16px, 4vw, 22px);
+      font-weight: 800;
+      color: var(--text);
+      cursor: pointer;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.1s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .num-btn:active { transform: scale(0.92); background: var(--accent); color: #1a1d2e; }
+    .num-btn.done   { color: var(--accent2); }
+
+    /* ══ AD BANNER ══ */
+    .ad-banner {
+      width: 100%;
+      min-height: 50px;
+      background: var(--bg3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    /* ══ MODAL ══ */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: flex-end;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal {
+      width: 100%;
+      background: var(--bg2);
+      border-radius: 24px 24px 0 0;
+      border-top: 2px solid var(--border);
+      padding: 20px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal-handle {
+      width: 36px; height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      margin: 0 auto 20px;
+    }
+    .modal-title {
+      font-size: 22px;
+      font-weight: 900;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .modal-sub {
+      font-size: 14px;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      background: var(--bg3);
+      border-radius: 12px;
+      padding: 14px 8px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 26px;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1;
+    }
+    .stat-time {
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--text);
+    }
+    .stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .btn-primary {
+      width: 100%;
+      padding: 15px;
+      border-radius: 14px;
+      background: var(--accent);
+      color: #1a1d2e;
+      font-weight: 800;
+      font-size: 15px;
+      border: none;
+      cursor: pointer;
+      touch-action: manipulation;
+      margin-bottom: 10px;
+    }
+    .btn-secondary {
+      width: 100%;
+      padding: 13px;
+      border-radius: 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .badge-easy   { background: #dcfce7; color: #166534; }
+    .badge-medium { background: #fef9c3; color: #854d0e; }
+    .badge-hard   { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <button class="header-btn" id="btn-new">🔄</button>
+    <div class="header-title">СУДОКУ</div>
+    <div class="header-right">
+      <div class="timer-display" id="timer">0:00</div>
+      <button class="header-btn" id="btn-stats-open">📊</button>
+    </div>
+  </div>
+
+  <!-- DIFFICULTY -->
+  <div class="difficulty-bar">
+    <button class="diff-btn active" data-diff="easy">Лёгкий</button>
+    <button class="diff-btn" data-diff="medium">Средний</button>
+    <button class="diff-btn" data-diff="hard">Сложный</button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="grid-wrap">
+      <div class="sudoku-grid" id="grid"></div>
+    </div>
+
+    <div class="toolbar">
+      <button class="tool-btn" id="btn-erase">✕ Стереть</button>
+      <button class="tool-btn" id="btn-notes">✏️ Заметки</button>
+      <button class="tool-btn" id="btn-hint">💡 Подсказка</button>
+    </div>
+
+    <div class="numpad" id="numpad"></div>
+  </div>
+
+  <!-- AD BANNER -->
+  <div class="ad-banner" id="ad-banner">
+    <!-- Здесь будет код РСЯ -->
+    <!-- <div id="yandex_rtb_XXXXXXXX"></div> -->
+    <!-- <script>window.yaContextCb.push(()=>{Ya.Context.AdvManager.render({...})})</script> -->
+  </div>
+
+</div>
+
+<!-- МОДАЛ: ПОБЕДА -->
+<div class="modal-overlay" id="win-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🎉 Решено!</div>
+    <div style="text-align:center;margin-bottom:12px;">
+      <span class="badge" id="win-badge">Лёгкий</span>
+    </div>
+    <div class="modal-sub" id="win-time">Время: 0:00</div>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-num" id="s-solved">0</div><div class="stat-label">Решено</div></div>
+      <div class="stat-box"><div class="stat-time" id="s-best">—</div><div class="stat-label">Лучшее время</div></div>
+      <div class="stat-box"><div class="stat-num" id="s-streak">0</div><div class="stat-label">Серия</div></div>
+    </div>
+    <button class="btn-primary" id="btn-share">👥 Поделись результатом</button>
+    <button class="btn-secondary" id="btn-new-game">Новая игра</button>
+  </div>
+</div>
+
+<!-- МОДАЛ: СТАТИСТИКА -->
+<div class="modal-overlay" id="stats-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Статистика</div>
+    <div class="stats-grid" style="margin-top:16px;">
+      <div class="stat-box"><div class="stat-num" id="ss-solved">0</div><div class="stat-label">Решено</div></div>
+      <div class="stat-box"><div class="stat-time" id="ss-best">—</div><div class="stat-label">Лучшее время</div></div>
+      <div class="stat-box"><div class="stat-num" id="ss-streak">0</div><div class="stat-label">Серия</div></div>
+    </div>
+    <button class="btn-secondary" id="btn-close-stats">Закрыть</button>
+  </div>
+</div>
+
+<script src="sudoku.js"></script>
+</body>
+</html>
