@@ -109,7 +109,7 @@ function loadGameState(){return ls('active_game',null);}
 
 // ══ BACKEND API REPORTING ════════════════════════════════════
 // Замените на реальный URL вашего Railway backend
-const API_BASE = ''; // например: 'https://nature-scanner-backend-pr.railway.app'
+const API_BASE = 'sudoku-backend-production-624b.up.railway.app'; // например: 'https://nature-scanner-backend-pr.railway.app'
 
 function apiHeaders(){
   return{
