@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Судоку</title>
+  <script src="https://bridge.max.ru/mobi-bridge.js"></script>
+  <style>
+    :root {
+      --bg:     #f5f7fa;
+      --bg2:    #ffffff;
+      --bg3:    #eef1f6;
+      --border: rgba(0,0,0,0.08);
+      --accent: #e8c847;
+      --green:  #3ddc84;
+      --text:   #1a1d2e;
+      --muted:  #9098b0;
+      --user:   #2563eb;
+      --error:  #ef4444;
+      --sel:    #dbeafe;
+      --hi:     #eff6ff;
+      --same:   #bfdbfe;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bot: env(safe-area-inset-bottom, 0px);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{
+      height:100%;width:100%;
+      background:var(--bg2);color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      overflow:hidden;-webkit-tap-highlight-color:transparent;
+      overscroll-behavior:none;user-select:none;touch-action:none;
+    }
+    #app{display:flex;flex-direction:column;height:100dvh;overflow:hidden;}
+    .screen{display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;}
+    .screen.active{display:flex;}
+    .scroll-area{
+      flex:1;overflow-y:auto;overflow-x:hidden;
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior-y:contain;touch-action:pan-y;
+    }
+    .scroll-area::-webkit-scrollbar{display:none;}
+
+    /* ══ HEADER ══ */
+    .header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:calc(var(--safe-top) + 10px) 14px 9px;
+      background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;
+    }
+    .header-title{font-size:17px;font-weight:900;letter-spacing:.5px;text-transform:uppercase;}
+    .hbtn{
+      width:30px;height:30px;border-radius:8px;
+      background:var(--bg3);border:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;touch-action:manipulation;flex-shrink:0;
+    }
+    .hbtn svg{width:15px;height:15px;stroke:var(--text);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+
+    /* ══ BOTTOM NAV ══ */
+    .bottom-nav{
+      display:flex;background:var(--bg2);border-top:1px solid var(--border);
+      padding-bottom:max(var(--safe-bot),20px);flex-shrink:0;
+    }
+    .nav-btn{
+      flex:1;padding:10px 4px 0;
+      display:flex;flex-direction:column;align-items:center;gap:3px;
+      cursor:pointer;touch-action:manipulation;
+      font-size:11px;font-weight:700;color:var(--muted);transition:color .15s;
+    }
+    .nav-btn.active{color:var(--accent);}
+    .nav-btn svg{width:22px;height:22px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+
+    /* ══ HOME ══ */
+    .home-pad{padding:12px 13px 20px;}
+    .streak-card{
+      background:var(--bg2);border:1px solid var(--border);border-radius:11px;
+      padding:10px 13px;display:flex;align-items:center;gap:10px;margin-bottom:10px;
+    }
+    .streak-num{font-size:22px;font-weight:900;color:var(--accent);line-height:1;}
+    .streak-lbl{font-size:11px;color:var(--muted);}
+    .daily-card{
+      background:linear-gradient(135deg,#1a1d2e 0%,#2d3561 100%);
+      border-radius:14px;padding:14px;margin-bottom:10px;
+    }
+    .daily-card.done{
+      background:linear-gradient(135deg,#166534 0%,#15803d 100%);
+    }
+    .daily-badge{font-size:14px;font-weight:900;color:var(--accent);letter-spacing:1.5px;margin-bottom:8px;}
+    .daily-card.done .daily-badge{color:#86efac;}
+    .daily-meta{font-size:11px;color:rgba(255,255,255,.55);margin-bottom:10px;}
+    .daily-card.done .daily-meta{color:rgba(255,255,255,.7);margin-bottom:6px;}
+    .daily-done-msg{font-size:13px;font-weight:700;color:#86efac;margin-bottom:4px;}
+    .daily-next-msg{font-size:11px;color:rgba(255,255,255,.55);}
+    .btn-play{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:9px 18px;border-radius:9px;
+      background:var(--accent);color:#1a1d2e;
+      font-size:13px;font-weight:800;border:none;
+      cursor:pointer;touch-action:manipulation;
+    }
+    .btn-play:disabled{background:rgba(255,255,255,.15);color:rgba(255,255,255,.4);cursor:default;}
+    .section-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:12px 0 7px;}
+    .level-card{
+      background:var(--bg2);border:1px solid var(--border);border-radius:11px;
+      padding:10px 13px;display:flex;align-items:center;gap:11px;
+      cursor:pointer;touch-action:manipulation;transition:all .15s;margin-bottom:7px;
+    }
+    .level-card:active{transform:scale(.98);background:var(--bg3);}
+    .level-card.locked{opacity:.5;cursor:default;}
+    .level-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+    .level-name{font-size:14px;font-weight:800;margin-bottom:1px;}
+    .level-desc{font-size:11px;color:var(--muted);}
+    .level-right{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted);flex-shrink:0;}
+
+    /* ══ GAME SCREEN ══ */
+    .game-header{
+      display:flex;align-items:center;
+      padding:calc(var(--safe-top)+16px) 14px 24px;
+      background:var(--bg2);border-bottom:1px solid var(--border);
+      flex-shrink:0;gap:0;
+    }
+    .game-back{
+      width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;touch-action:manipulation;flex-shrink:0;
+    }
+    .game-back svg{width:22px;height:22px;stroke:var(--user);stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+    .game-pause{
+      width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+      cursor:pointer;touch-action:manipulation;flex-shrink:0;
+    }
+    .game-pause svg{width:22px;height:22px;stroke:var(--muted);stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+    .game-metas{display:flex;flex:1;justify-content:space-around;align-items:center;}
+    .gmeta{display:flex;flex-direction:column;align-items:center;}
+    .gmeta-lbl{font-size:10px;color:var(--muted);font-weight:600;margin-bottom:2px;}
+    .gmeta-val{font-size:16px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--text);}
+    .gmeta-val.blue{color:var(--user);}
+
+    /* ══ GAME MAIN ══ */
+    .game-main{
+      flex:1;display:flex;flex-direction:column;
+      align-items:center;padding:6px 8px 2px;gap:6px;
+      overflow:hidden;min-height:0;touch-action:none;
+      background:var(--bg2);
+    }
+
+    /* ══ РЕКЛАМНЫЙ БАННЕР в игре ══ */
+    .game-ad-banner{
+      width:100%;max-width:480px;
+      height:max(70px, calc(var(--safe-bot) + 60px));
+      background:var(--bg3);border-radius:10px 10px 0 0;
+      display:flex;align-items:center;justify-content:center;
+      font-size:11px;color:var(--muted);font-weight:600;
+      flex-shrink:0;overflow:hidden;position:relative;
+      margin:0 -8px;width:calc(100% + 16px);
+    }
+    /* ═══════════════════════════════════════════════════════════
+       РСЯ БАННЕР — замените yabs-placeholder на реальный блок:
+       <script> Ya.Context.AdvManager.render({ blockId: "R-A-XXXXXX-1", renderTo: "yandex_rtb_R-A-XXXXXX-1" })</script>
+       ВК Реклама: <script> vkAdsInit({ blockId: "vk_ads_XXXXXX" })</script>
+    ════════════════════════════════════════════════════════════ */
+    #game-banner-slot{ width:100%;height:100%; }
+
+    /* ══ GRID ══ */
+    .grid-wrap{
+      width:min(100%,calc(100dvh - 260px));
+      aspect-ratio:1;flex-shrink:0;
+    }
+    .sudoku-grid{
+      width:100%;height:100%;
+      display:grid;
+      grid-template-columns:repeat(9,1fr);
+      grid-template-rows:repeat(9,1fr);
+      border:2.5px solid #3a3f5c;border-radius:4px;overflow:hidden;background:var(--bg2);
+    }
+    .cell{
+      display:flex;align-items:center;justify-content:center;
+      /* Максимально крупные цифры — занимают ~85% ячейки */
+      font-size:min(5.5vw, calc((100dvh - 260px) / 9 * 0.72));
+      font-weight:800;
+      border-right:1px solid rgba(0,0,0,.1);
+      border-bottom:1px solid rgba(0,0,0,.1);
+      cursor:pointer;transition:background .08s;touch-action:manipulation;
+      color:var(--text);line-height:1;
+    }
+    .cell:nth-child(3n){border-right:2px solid rgba(58,63,92,.4);}
+    .cell:nth-child(9n){border-right:none;}
+    .cell[data-row="2"]{border-bottom:2px solid rgba(58,63,92,.4);}
+    .cell[data-row="5"]{border-bottom:2px solid rgba(58,63,92,.4);}
+    .cell[data-row="8"]{border-bottom:none;}
+    .cell.given{color:var(--text);font-weight:900;}
+    .cell.uval{color:var(--user);}
+    .cell.err{color:var(--error);background:#fee2e2!important;}
+    .cell.sel{background:var(--sel)!important;}
+    .cell.hi{background:var(--hi);}
+    .cell.snum{background:var(--same);}
+    .cell-notes{
+      display:grid;grid-template-columns:repeat(3,1fr);
+      grid-template-rows:repeat(3,1fr);width:100%;height:100%;padding:0;
+    }
+    .note{
+      display:flex;align-items:center;justify-content:center;
+      font-size:min(2.8vw, calc((100dvh - 260px) / 9 / 3 * 0.7));
+      font-weight:700;color:var(--muted);line-height:1;
+    }
+
+    /* ══ TOOLBAR ══ */
+    .toolbar{
+      display:flex;width:100%;max-width:400px;
+      justify-content:space-around;align-items:flex-start;
+    }
+    .tbtn{
+      display:flex;flex-direction:column;align-items:center;gap:3px;
+      cursor:pointer;touch-action:manipulation;
+      background:none;border:none;padding:2px 6px;
+      position:relative;
+    }
+    .tbtn-icon{
+      width:38px;height:38px;border-radius:50%;
+      background:var(--bg3);
+      display:flex;align-items:center;justify-content:center;
+      transition:all .15s;
+    }
+    .tbtn-icon svg{width:18px;height:18px;stroke:var(--muted);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+    .tbtn-lbl{font-size:10px;font-weight:600;color:var(--muted);}
+    .tbtn.active .tbtn-icon{background:var(--accent);}
+    .tbtn.active .tbtn-icon svg{stroke:#1a1d2e;}
+    .tbtn.active .tbtn-lbl{color:var(--accent);}
+    .tbtn:active .tbtn-icon{opacity:.7;transform:scale(.92);}
+
+    /* Бейдж на кнопке */
+    .tbtn-badge{
+      position:absolute;top:0;right:2px;
+      min-width:17px;height:17px;border-radius:9px;
+      background:var(--user);color:#fff;
+      font-size:10px;font-weight:800;
+      display:flex;align-items:center;justify-content:center;
+      padding:0 4px;
+    }
+
+    /* ══ NUMPAD ══ */
+    .numpad{
+      display:grid;grid-template-columns:repeat(9,1fr);
+      gap:3px;width:100%;max-width:400px;
+    }
+    .nbtn{
+      aspect-ratio:1;border-radius:6px;
+      border:none;background:transparent;
+      font-size:clamp(26px,7vw,40px);font-weight:800;color:var(--user);
+      cursor:pointer;touch-action:manipulation;
+      display:flex;align-items:center;justify-content:center;
+      transition:all .1s;
+    }
+    .nbtn:active{transform:scale(.88);color:var(--accent);}
+    .nbtn.done{color:var(--muted);opacity:.4;}
+
+    /* ══ PROFILE ══ */
+    .profile-pad{padding:12px 13px 20px;}
+    /* Блокируем pull-to-close на экране профиля */
+    #screen-profile .scroll-area{
+      overscroll-behavior-y:contain;
+      -webkit-overflow-scrolling:touch;
+    }
+    .profile-top{
+      background:linear-gradient(135deg,#1a1d2e,#2d3561);
+      border-radius:14px;padding:14px;margin-bottom:10px;
+      display:flex;align-items:center;gap:12px;
+      position:relative;
+    }
+    .p-avatar-wrap{position:relative;flex-shrink:0;}
+    .p-avatar{
+      width:52px;height:52px;border-radius:50%;
+      background:var(--accent);
+      display:flex;align-items:center;justify-content:center;
+      font-size:20px;font-weight:900;color:#1a1d2e;
+      overflow:hidden;
+    }
+    .p-avatar img{width:100%;height:100%;object-fit:cover;}
+    .p-avatar-edit{
+      position:absolute;bottom:0;right:0;
+      width:18px;height:18px;border-radius:50%;
+      background:var(--user);
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;touch-action:manipulation;
+    }
+    .p-avatar-edit svg{width:10px;height:10px;stroke:#fff;stroke-width:2.5;fill:none;}
+    .p-info{flex:1;min-width:0;}
+    .p-name{font-size:15px;font-weight:900;color:#fff;margin-bottom:2px;}
+    .p-sub{font-size:11px;color:rgba(255,255,255,.5);}
+    .p-edit-btn{
+      padding:5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.25);
+      background:transparent;color:rgba(255,255,255,.7);font-size:11px;font-weight:700;
+      cursor:pointer;touch-action:manipulation;
+    }
+    .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px;}
+    .stat-box{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:10px 6px;text-align:center;}
+    .stat-num{font-size:20px;font-weight:900;color:var(--text);line-height:1;}
+    .stat-lbl{font-size:10px;color:var(--muted);margin-top:2px;}
+    .hist-item{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+    .hi-left{display:flex;align-items:center;gap:9px;}
+    .hi-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+    .hi-name{font-size:13px;font-weight:700;}
+    .hi-date{font-size:10px;color:var(--muted);}
+    .hi-time{font-size:13px;font-weight:800;color:var(--user);}
+
+    /* ══ EDIT NAME MODAL ══ */
+    .edit-field{
+      width:100%;padding:12px 14px;border-radius:10px;
+      border:1.5px solid var(--border);font-size:15px;font-weight:600;
+      background:var(--bg3);color:var(--text);outline:none;
+      margin-bottom:12px;
+    }
+    .edit-field:focus{border-color:var(--user);}
+
+    /* ══ MODALS ══ */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);display:flex;align-items:flex-end;z-index:200;opacity:0;pointer-events:none;transition:opacity .25s;}
+    .overlay.open{opacity:1;pointer-events:auto;}
+    .modal{width:100%;background:var(--bg2);border-radius:18px 18px 0 0;border-top:1px solid var(--border);padding:14px 14px calc(max(var(--safe-bot),12px) + 6px);transform:translateY(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);}
+    .overlay.open .modal{transform:translateY(0);}
+    .mtitle{font-size:17px;font-weight:900;text-align:center;margin-bottom:4px;}
+    .msub{font-size:12px;color:var(--muted);text-align:center;margin-bottom:12px;}
+    .mstats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px;}
+    .btnp{width:100%;padding:12px;border-radius:11px;background:var(--accent);color:#1a1d2e;font-weight:800;font-size:14px;border:none;cursor:pointer;touch-action:manipulation;margin-bottom:7px;}
+    .btns{width:100%;padding:10px;border-radius:11px;background:transparent;border:1px solid var(--border);color:var(--text);font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation;}
+    .hint-box{background:var(--bg3);border-radius:10px;padding:12px;text-align:center;margin-bottom:10px;}
+    .hint-box-title{font-size:14px;font-weight:800;margin-bottom:4px;}
+    .hint-box-sub{font-size:11px;color:var(--muted);margin-bottom:9px;}
+    .badge{display:inline-block;padding:3px 8px;border-radius:100px;font-size:11px;font-weight:700;margin-bottom:6px;}
+    .b1{background:#dcfce7;color:#166534;}
+    .b2{background:#fef9c3;color:#854d0e;}
+    .b3{background:#fee2e2;color:#991b1b;}
+    .b4{background:#fae8ff;color:#701a75;}
+    .b5{background:#1a1d2e;color:#fff;}
+
+    /* Rewarded ad container в модалке */
+    .rewarded-ad-container{
+      width:100%;min-height:80px;background:var(--bg3);border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      margin-bottom:10px;overflow:hidden;
+      /* Здесь будет реальный rewarded video от РСЯ/ВК */
+    }
+
+    /* ══ LEADERBOARD ══ */
+    .lb-tab{
+      padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;
+      color:var(--muted);background:var(--bg3);border:1px solid var(--border);
+      cursor:pointer;white-space:nowrap;touch-action:manipulation;transition:all .15s;flex-shrink:0;
+    }
+    .lb-tab.active{background:var(--accent);color:#1a1d2e;border-color:var(--accent);}
+    .lb-row{
+      display:flex;align-items:center;gap:10px;
+      padding:10px 12px;border-radius:11px;
+      background:var(--bg2);border:1px solid var(--border);
+      margin-bottom:6px;
+    }
+    .lb-row.me{background:linear-gradient(135deg,#1a1d2e,#2d3561);border-color:#3a3f5c;}
+    .lb-rank{
+      width:26px;font-size:13px;font-weight:900;text-align:center;
+      color:var(--muted);flex-shrink:0;
+    }
+    .lb-rank.gold{color:#f59e0b;}
+    .lb-rank.silver{color:#94a3b8;}
+    .lb-rank.bronze{color:#b45309;}
+    .lb-row.me .lb-rank,.lb-row.me .lb-name,.lb-row.me .lb-stat{color:#fff;}
+    .lb-avatar{
+      width:34px;height:34px;border-radius:50%;
+      background:var(--accent);color:#1a1d2e;
+      font-size:13px;font-weight:900;
+      display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;overflow:hidden;
+    }
+    .lb-avatar img{width:100%;height:100%;object-fit:cover;}
+    .lb-info{flex:1;min-width:0;}
+    .lb-name{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .lb-sub{font-size:10px;color:var(--muted);}
+    .lb-stat{font-size:14px;font-weight:900;color:var(--user);flex-shrink:0;}
+    .lb-row.me .lb-stat{color:var(--accent);}
+    .lb-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:12px 0 6px;}
+    .lb-my-pos{
+      background:linear-gradient(135deg,#1a1d2e,#2d3561);
+      border-radius:11px;padding:12px;margin-bottom:12px;
+      display:flex;align-items:center;gap:10px;
+    }
+    .lb-my-pos .lb-name{color:#fff;font-size:14px;}
+    .lb-my-pos .lb-stat{color:var(--accent);font-size:16px;}
+    .lb-my-pos .lb-rank{color:rgba(255,255,255,.6);font-size:12px;width:auto;}
+
+    /* ══ REWARDED VIDEO — FULLSCREEN ══ */
+    .rv-fullscreen{
+      position:fixed;inset:0;
+      background:#000;
+      z-index:300;
+      display:flex;flex-direction:column;
+      align-items:center;
+      opacity:0;pointer-events:none;
+      transition:opacity .25s;
+    }
+    .rv-fullscreen.open{opacity:1;pointer-events:auto;}
+    .rv-fs-content{
+      width:100%;
+      flex:1;
+      display:flex;flex-direction:column;
+      align-items:center;
+    }
+    /* Рекламный экран — занимает большую часть высоты, поддерживает вертикальные видео */
+    .rv-fs-screen{
+      width:100%;
+      flex:1;
+      background:#111;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      position:relative;overflow:hidden;
+      /* нет border-radius сверху — выглядит как настоящее видео на весь экран */
+    }
+    .rv-fs-skip{
+      position:absolute;top:calc(var(--safe-top) + 10px);right:14px;
+      padding:6px 14px;border-radius:8px;
+      background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);
+      color:rgba(255,255,255,.85);font-size:13px;font-weight:700;
+      cursor:pointer;touch-action:manipulation;
+    }
+    .rv-fs-skip.ready{background:var(--accent);color:#1a1d2e;border-color:transparent;}
+    /* Нижняя панель с прогрессом и кнопками */
+    .rv-fs-bottom{
+      width:100%;
+      background:#0a0a0a;
+      padding:14px 20px calc(max(var(--safe-bot),16px) + 4px);
+      display:flex;flex-direction:column;gap:8px;
+      flex-shrink:0;
+    }
+    .rv-fs-progress{width:100%;height:4px;background:rgba(255,255,255,.12);border-radius:2px;}
+    .rv-fs-bar{height:100%;background:var(--accent);border-radius:2px;transition:width .5s linear;width:0%;}
+    .rv-fs-label{color:rgba(255,255,255,.45);font-size:11px;font-weight:600;text-align:center;}
+    .rv-fs-action{
+      width:100%;padding:14px;border-radius:12px;
+      background:var(--accent);color:#1a1d2e;
+      font-size:15px;font-weight:800;border:none;
+      cursor:pointer;touch-action:manipulation;
+    }
+    .rv-fs-action:disabled{background:rgba(255,255,255,.1);color:rgba(255,255,255,.25);cursor:default;}
+    .rv-fs-cancel{
+      width:100%;padding:10px;border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:transparent;color:rgba(255,255,255,.5);
+      font-size:14px;font-weight:600;
+      cursor:pointer;touch-action:manipulation;
+    }
+
+    /* ══ ПАУЗА — рекламный слот ══ */
+    .pause-ad-zone{
+      position:fixed;
+      top:0;left:0;right:0;bottom:0;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:rgba(10,10,15,.96);
+      z-index:199;
+      pointer-events:none;opacity:0;transition:opacity .25s;
+      padding:calc(var(--safe-top) + 12px) 20px calc(var(--safe-bot) + 180px);
+      /* 180px — высота модалки паузы снизу */
+    }
+    .pause-ad-zone.open{opacity:1;}
+    .pause-ad-mock{
+      width:100%;max-width:380px;
+      background:linear-gradient(160deg,#1a1d2e 0%,#16213e 50%,#0f3460 100%);
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 8px 32px rgba(0,0,0,.6);
+      display:flex;flex-direction:column;
+    }
+    .pause-ad-top{
+      flex:1;padding:28px 20px 20px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:12px;
+    }
+    .pause-ad-brand{
+      width:56px;height:56px;border-radius:14px;
+      background:linear-gradient(135deg,#e8c847,#f59e0b);
+      display:flex;align-items:center;justify-content:center;
+      font-size:26px;
+    }
+    .pause-ad-title{font-size:17px;font-weight:900;color:#fff;text-align:center;}
+    .pause-ad-sub{font-size:12px;color:rgba(255,255,255,.5);text-align:center;line-height:1.4;}
+    .pause-ad-cta{
+      margin:4px 0 0;
+      padding:10px 24px;border-radius:8px;
+      background:var(--accent);color:#1a1d2e;
+      font-size:13px;font-weight:800;border:none;
+    }
+    .pause-ad-footer{
+      padding:8px 14px;
+      background:rgba(0,0,0,.25);
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .pause-ad-label{font-size:9px;color:rgba(255,255,255,.3);font-weight:600;letter-spacing:.5px;}
+    .pause-ad-close{font-size:9px;color:rgba(255,255,255,.25);font-weight:600;}
+
+    #toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(26,29,46,.88);color:#fff;padding:9px 18px;border-radius:100px;font-size:13px;font-weight:700;z-index:999;pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap;}
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ HOME ══ -->
+  <div id="screen-home" class="screen active">
+    <div class="header">
+      <div class="header-title">СУДОКУ</div>
+      <div class="hbtn" id="btn-home-stats">
+        <svg viewBox="0 0 24 24"><rect x="18" y="3" width="3" height="18" rx="1"/><rect x="10.5" y="8" width="3" height="13" rx="1"/><rect x="3" y="13" width="3" height="8" rx="1"/></svg>
+      </div>
+    </div>
+    <div class="scroll-area">
+      <div class="home-pad">
+        <div class="streak-card">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <div>
+            <div class="streak-num" id="home-streak">0</div>
+            <div class="streak-lbl">дней подряд</div>
+          </div>
+        </div>
+        <!-- Resume banner injected here by JS -->
+        <div class="daily-card" id="daily-card">
+          <div class="daily-badge" id="daily-badge-text">СУДОКУ ДНЯ</div>
+          <div class="daily-meta" id="daily-date-el">—</div>
+          <div id="daily-content">
+            <div id="daily-done-row" style="display:none;margin-bottom:8px;">
+              <div class="daily-done-msg">✓ Решено!</div>
+              <div class="daily-next-msg">Следующее — завтра</div>
+            </div>
+            <button class="btn-play" id="btn-daily">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+              Играть
+            </button>
+          </div>
+        </div>
+        <div class="section-lbl">Уровни сложности</div>
+        <div id="levels-list"></div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-btn active" data-screen="home">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        Главная
+      </div>
+      <div class="nav-btn" data-screen="leaderboard">
+        <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        Рейтинг
+      </div>
+      <div class="nav-btn" data-screen="profile">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Профиль
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ GAME ══ -->
+  <div id="screen-game" class="screen">
+    <div class="game-header">
+      <div class="game-back" id="btn-back">
+        <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+      </div>
+      <div class="game-metas">
+        <div class="gmeta">
+          <div class="gmeta-lbl">Дата</div>
+          <div class="gmeta-val blue" id="g-date">—</div>
+        </div>
+        <div class="gmeta">
+          <div class="gmeta-lbl">Ошибки</div>
+          <div class="gmeta-val" id="g-errors">0/3</div>
+        </div>
+        <div class="gmeta">
+          <div class="gmeta-lbl">Время</div>
+          <div class="gmeta-val" id="g-timer">0:00</div>
+        </div>
+      </div>
+      <div class="game-pause" id="btn-pause">
+        <svg viewBox="0 0 24 24"><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/><circle cx="12" cy="12" r="10"/></svg>
+      </div>
+    </div>
+    <div class="game-main">
+      <div class="grid-wrap">
+        <div class="sudoku-grid" id="grid"></div>
+      </div>
+      <div class="toolbar">
+        <button class="tbtn" id="btn-undo">
+          <div class="tbtn-icon" style="position:relative;">
+            <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+            <div class="tbtn-badge" id="undo-badge">1</div>
+          </div>
+          <div class="tbtn-lbl">Отменить</div>
+        </button>
+        <button class="tbtn" id="btn-erase">
+          <div class="tbtn-icon">
+            <svg viewBox="0 0 24 24"><path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+          </div>
+          <div class="tbtn-lbl">Очистить</div>
+        </button>
+        <button class="tbtn" id="btn-notes">
+          <div class="tbtn-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </div>
+          <div class="tbtn-lbl" id="notes-lbl">Заметки</div>
+        </button>
+        <button class="tbtn" id="btn-hint">
+          <div class="tbtn-icon" style="position:relative;">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div class="tbtn-badge" id="hint-badge">1</div>
+          </div>
+          <div class="tbtn-lbl">Подсказка</div>
+        </button>
+      </div>
+      <div class="numpad" id="numpad"></div>
+      <!-- ══ РЕКЛАМНЫЙ БАННЕР (РСЯ / ВК Реклама) ══
+           Замените содержимое div#game-banner-slot на реальный тег скрипта рекламной сети.
+           РСЯ пример: <div id="yandex_rtb_R-A-XXXXXX-1"></div>
+           ВК пример:  <div id="vk_ads_XXXXXX"></div>
+      -->
+      <div class="game-ad-banner">
+        <div id="game-banner-slot" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);">
+          <!-- AD SLOT: вставьте сюда скрипт РСЯ или ВК Рекламы -->
+          Реклама
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ LEADERBOARD ══ -->
+  <div id="screen-leaderboard" class="screen">
+    <div class="header">
+      <div class="header-title">ЛИДЕРЫ</div>
+      <div style="display:flex;gap:6px;">
+        <div class="hbtn" id="lb-filter-btn" title="Фильтр">
+          <svg viewBox="0 0 24 24"><polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/></svg>
+        </div>
+      </div>
+    </div>
+    <!-- Фильтры -->
+    <div style="display:flex;gap:6px;padding:8px 13px;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;" id="lb-tabs">
+      <div class="lb-tab active" data-level="all">Все</div>
+      <div class="lb-tab" data-level="easy">Лёгкий</div>
+      <div class="lb-tab" data-level="medium">Средний</div>
+      <div class="lb-tab" data-level="hard">Сложный</div>
+      <div class="lb-tab" data-level="expert">Эксперт</div>
+      <div class="lb-tab" data-level="master">Мастер</div>
+    </div>
+    <div class="scroll-area">
+      <div style="padding:6px 13px 20px;" id="lb-list"></div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-btn" data-screen="home">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        Главная
+      </div>
+      <div class="nav-btn" data-screen="leaderboard">
+        <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        Рейтинг
+      </div>
+      <div class="nav-btn active" data-screen="profile">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Профиль
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PROFILE ══ -->
+  <div id="screen-profile" class="screen">
+    <div class="header">
+      <div class="header-title">ПРОФИЛЬ</div>
+    </div>
+    <div class="scroll-area">
+      <div class="profile-pad">
+        <div class="profile-top">
+          <div class="p-avatar-wrap">
+            <div class="p-avatar" id="p-avatar">И</div>
+            <div class="p-avatar-edit" id="btn-avatar-edit">
+              <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </div>
+            <input type="file" id="avatar-file-input" accept="image/*" style="display:none"/>
+          </div>
+          <div class="p-info">
+            <div class="p-name" id="p-name">Игрок</div>
+            <div class="p-sub" id="p-sub">Серия: 0 дней</div>
+          </div>
+          <button class="p-edit-btn" id="btn-edit-name">✏ Имя</button>
+        </div>
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-num" id="p-solved">0</div><div class="stat-lbl">Решено</div></div>
+          <div class="stat-box"><div class="stat-num" id="p-streak">0</div><div class="stat-lbl">Серия</div></div>
+          <div class="stat-box"><div class="stat-num" id="p-best-streak">0</div><div class="stat-lbl">Рекорд</div></div>
+        </div>
+        <div class="section-lbl">По уровням</div>
+        <div id="p-levels"></div>
+        <div class="section-lbl">История</div>
+        <div id="p-history"></div>
+      </div>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-btn" data-screen="home">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        Главная
+      </div>
+      <div class="nav-btn" data-screen="leaderboard">
+        <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        Рейтинг
+      </div>
+      <div class="nav-btn active" data-screen="profile">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Профиль
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- PAUSE AD ZONE -->
+<div id="pause-ad-zone" class="pause-ad-zone">
+  <!-- AD SLOT ПАУЗА: замените .pause-ad-mock на скрипт РСЯ/ВК -->
+  <div class="pause-ad-mock">
+    <div class="pause-ad-top">
+      <div class="pause-ad-brand">🎯</div>
+      <div class="pause-ad-title">Реклама</div>
+      <div class="pause-ad-sub">Здесь будет реклама от РСЯ или ВК Рекламы.<br>Вставьте ваш блок сюда.</div>
+      <button class="pause-ad-cta">Узнать подробнее</button>
+    </div>
+    <div class="pause-ad-footer">
+      <div class="pause-ad-label">РЕКЛАМА</div>
+      <div class="pause-ad-close">Рекламный блок</div>
+    </div>
+  </div>
+</div>
+
+<!-- PAUSE -->
+<div class="overlay" id="pause-overlay">
+  <div class="modal" style="text-align:center;">
+    <div class="mtitle">Пауза</div>
+    <div class="msub" id="pause-time-display">0:00</div>
+    <button class="btnp" id="btn-resume">▶ Продолжить</button>
+    <button class="btns" id="btn-pause-home">На главную</button>
+  </div>
+</div>
+
+<!-- WIN -->
+<div class="overlay" id="win-overlay">
+  <div class="modal">
+    <div class="mtitle" id="win-title">Решено!</div>
+    <div style="text-align:center;margin-bottom:7px;"><span class="badge" id="win-badge">Лёгкий</span></div>
+    <div class="msub" id="win-sub">Время: 0:00</div>
+    <div class="mstats" id="win-stats"></div>
+    <button class="btnp" id="btn-win-share">Поделись результатом</button>
+    <button class="btns" id="btn-win-home">На главную</button>
+  </div>
+</div>
+
+<!-- HINT CONFIRM (шаг 1: предупреждение) -->
+<div class="overlay" id="hint-overlay">
+  <div class="modal" style="text-align:center;">
+    <div class="mtitle">Нужна подсказка?</div>
+    <div class="msub">Бесплатные подсказки закончились.<br>Посмотри короткую рекламу и получи подсказку.</div>
+    <button class="btnp" id="btn-watch-hint-ad">Смотреть рекламу</button>
+    <button class="btns" id="btn-hint-cancel">Отмена</button>
+  </div>
+</div>
+
+<!-- HINT REWARDED VIDEO (шаг 2: fullscreen видео) -->
+<div class="rv-fullscreen" id="hint-rv-fullscreen">
+  <div class="rv-fs-content">
+    <div class="rv-fs-screen" id="hint-rv-screen">
+      <!-- AD SLOT: здесь будет вертикальное rewarded-видео РСЯ/ВК -->
+      <div style="opacity:.35;font-size:48px;margin-bottom:12px;">📺</div>
+      <div style="color:rgba(255,255,255,.3);font-size:13px;font-weight:600;">Видеореклама</div>
+      <button class="rv-fs-skip" id="hint-rv-skip">5</button>
+    </div>
+  </div>
+  <div class="rv-fs-bottom">
+    <div class="rv-fs-progress"><div class="rv-fs-bar" id="hint-rv-bar"></div></div>
+    <div class="rv-fs-label" id="hint-rv-label">Смотрите рекламу...</div>
+    <button class="rv-fs-action" id="hint-rv-claim" disabled>Получить подсказку</button>
+    <button class="rv-fs-cancel" id="hint-rv-cancel">Отмена</button>
+  </div>
+</div>
+
+<!-- UNDO CONFIRM (шаг 1) -->
+<div class="overlay" id="undo-overlay">
+  <div class="modal" style="text-align:center;">
+    <div class="mtitle">Отменить ход?</div>
+    <div class="msub">Бесплатная отмена использована.<br>Посмотри короткую рекламу, чтобы отменить ход.</div>
+    <button class="btnp" id="btn-watch-undo-ad">Смотреть рекламу</button>
+    <button class="btns" id="btn-undo-cancel">Отмена</button>
+  </div>
+</div>
+
+<!-- UNDO REWARDED VIDEO (шаг 2: fullscreen видео) -->
+<div class="rv-fullscreen" id="undo-rv-fullscreen">
+  <div class="rv-fs-content">
+    <div class="rv-fs-screen" id="undo-rv-screen">
+      <!-- AD SLOT: здесь будет вертикальное rewarded-видео РСЯ/ВК -->
+      <div style="opacity:.35;font-size:48px;margin-bottom:12px;">📺</div>
+      <div style="color:rgba(255,255,255,.3);font-size:13px;font-weight:600;">Видеореклама</div>
+      <button class="rv-fs-skip" id="undo-rv-skip">5</button>
+    </div>
+  </div>
+  <div class="rv-fs-bottom">
+    <div class="rv-fs-progress"><div class="rv-fs-bar" id="undo-rv-bar"></div></div>
+    <div class="rv-fs-label" id="undo-rv-label">Смотрите рекламу...</div>
+    <button class="rv-fs-action" id="undo-rv-claim" disabled>Отменить ход</button>
+    <button class="rv-fs-cancel" id="undo-rv-cancel">Отмена</button>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="overlay" id="stats-overlay">
+  <div class="modal">
+    <div class="mtitle">Статистика</div>
+    <div class="mstats" id="modal-stats" style="margin-top:10px;"></div>
+    <button class="btns" id="btn-close-stats">Закрыть</button>
+  </div>
+</div>
+
+<!-- EDIT NAME -->
+<div class="overlay" id="edit-name-overlay">
+  <div class="modal">
+    <div class="mtitle">Изменить имя</div>
+    <input type="text" class="edit-field" id="edit-name-input" placeholder="Введите имя" maxlength="24"/>
+    <button class="btnp" id="btn-save-name">Сохранить</button>
+    <button class="btns" id="btn-cancel-name">Отмена</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="sudoku.js"></script>
+</body>
+</html>
