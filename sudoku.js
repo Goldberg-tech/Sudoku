@@ -98,7 +98,7 @@ function loadGameState(){return ls('active_game',null);}
 
 // ══ BACKEND API ════════════════════════════════════════════════
 // ИСПРАВЛЕНО: добавлен https://
-const API_BASE = 'https://sudoku-backend-production-624b.up.railway.app';
+const API_BASE = '';
 
 function apiHeaders(){
   return{
