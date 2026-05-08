@@ -484,6 +484,10 @@ function saveResult(){
 // ══ WIN MODAL ════════════════════════════════════════════════
 function openWinModal(lst){
   const lvl=LEVELS.find(l=>l.id===currentLevel);
+  // Обновляем src баннера чтобы обойти кеш и зафиксировать показ
+  const winBannerImg=document.querySelector('#win-overlay .win-ad-banner img');
+  if(winBannerImg){winBannerImg.src=`https://go.cpaexchange.net/impression?creative_id=30591&affiliate_id=34696&r=${Date.now()}`;}
+
   document.getElementById('win-title').textContent=isDaily?'Судоку дня решено! 🎉':'Решено!';
   document.getElementById('win-badge').textContent=isDaily?'Судоку дня':(lvl?.name||'');
   document.getElementById('win-badge').className=`badge ${lvl?.badge||'b1'}`;
